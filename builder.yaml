@@ -1,3 +1,11 @@
 components:
-  - name: site
+  - name: classroom
+    role: web
+    platform: nodejs
+    platformVersion: "24"
+    build: npm ci --ignore-scripts && npm run build && node scripts/stage.mjs && npm ci --omit=dev --ignore-scripts --prefix "$DESTINATION_DIR"
+    run:
+      start: npm start
+      port: 8080
+      healthCheckPath: /api/health
     path: /

@@ -1,4 +1,4 @@
-# Contributing to App Service Builder: Svelte sample
+# Contributing to Cyclone Classroom
 
 This project welcomes contributions and suggestions.
 
@@ -28,7 +28,7 @@ follow [the security policy](SECURITY.md) instead of opening a public issue.
 
 1. Fork the repository and create a branch for your change.
 2. Install locked dependencies with `npm ci --ignore-scripts`.
-3. Keep the sample standalone, small, and free of external service dependencies.
+3. Keep local development self-contained; production uses Azure SQL and Builder authentication.
 4. Update tests and documentation when behavior changes.
 5. Run the checks and describe the changes and results in your pull request.
 
@@ -38,11 +38,13 @@ npm run build
 npm test
 ```
 
-For UI or routing changes, also run the production preview and verify the
-counter, direct deep links, refreshes, back/forward, and unknown routes in a
-browser. See [the README](README.md) for the HTTP verification script.
+For UI or routing changes, use `npm run dev` with separate browser profiles
+to verify professor and student flows, direct join links, refreshes,
+back/forward navigation, timed questions, and results. Check phone-sized
+layouts as well as desktop. See [the README](README.md).
 
-Keep all `VITE_*` values public. Preserve the deployment contract in
-`builder.yaml` and the static health/version files. Local preview behavior
-does not replace deployed SPA-fallback verification.
+Keep all `VITE_*` values public. Never enable simulated identities or SQLite
+fallback in the production entry point. Preserve server-side authorization,
+authoritative deadlines, and transactional submissions. Local tests do not
+replace Azure SQL and deployed sign-in verification.
 Do not commit installed dependencies, build output, environment files, or secrets.

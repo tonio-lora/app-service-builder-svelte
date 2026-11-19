@@ -2,20 +2,39 @@
   "name": "app-service-builder-svelte",
   "private": true,
   "version": "1.0.0",
-  "description": "Svelte and Vite single-page application sample for Azure App Service Builder.",
+  "description": "Live classroom quiz competitions with professor controls and Iowa State sign-in.",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "check": "svelte-check --tsconfig ./jsconfig.json",
+    "dev": "concurrently --kill-others \"vite --host 127.0.0.1\" \"tsx watch --env-file-if-exists=.env server/dev.ts\"",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "check": "svelte-check --tsconfig ./jsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "preview": "vite preview",
-    "test": "node --test static.test.mjs"
+    "start": "node --env-file-if-exists=.env build/server/start.js",
+    "db:migrate": "tsx --env-file-if-exists=.env server/migrate.ts",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "csv-parse": "^7.0.3",
+    "express": "^5.1.0",
+    "mssql": "^12.0.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/mssql": "^9.1.8",
+    "@types/node": "^22.15.0",
+    "@types/qrcode": "^1.5.5",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "concurrently": "^9.2.0",
     "svelte": "^5.57.3",
     "svelte-check": "4.7.8",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
     "vite": "^8.3.7"
   }
 }

@@ -1,232 +1,223 @@
-# App Service Builder: Svelte sample
+# Cyclone Classroom
 
-A standalone Svelte single-page application built with Vite for
-[Azure App Service Builder](https://builder.appservice.azure.com/docs/). It uses
-Svelte 5 runes and the browser History API, without SvelteKit or a routing
-library. The deployment consists only of static HTML, JavaScript, CSS, and
-JSON. There is no backend, database, external service, or hosted Vite
-development server.
+A browser-based, professor-led multiple-choice competition for Iowa State
+classrooms. Students use a phone or laptop: scan the lobby QR code, sign in
+with their `iastate.edu` Microsoft account, and answer each timed question.
 
-**App Service Builder is in Private Preview. Use this sample for development
-and testing, not as a production application template.** The original sample
-was successfully deployed with the included manifest and its tested links
-worked. The renamed repository must still be deployed and verified in your
-authorized preview environment. Local checks do not establish cloud deployment
-success or regional availability.
+## What it does
 
-## Sample preview
+- Professors import question banks from CSV and open competition lobbies.
+- Each lobby has a QR code, six-character code, and short path: `/j/ABC234`.
+  The hostname is the app's hostname; no external URL shortener is used.
+- Students choose a public display name; their verified email is visible
+  only to their professor in the roster and results export.
+- The professor starts each question, can close it early, reveals the correct
+  answer, and advances to the next question.
+- Questions automatically close at their server-defined deadline. The
+  professor controls when the next question begins.
+- Each account gets one locked answer per question. Correct answers receive
+  500 base points plus up to 500 speed points; incorrect/missed answers get 0.
+  Speed uses server receipt time, not the student's device clock.
+- Leaderboards update after the reveal, not while students are answering.
+  Ties share a rank.
+- Quizzes, competition snapshots, participants, and answers are saved.
+  Professors can reopen competitions and export one CSV row per student/question.
+- Rejoining an existing seat works after a refresh; new students cannot join
+  after the first question starts.
 
-![Svelte root page with deep-route navigation, an interactive counter, inline static health feedback, and customization help](docs/images/sample.png)
+Designed for a roughly 50-student class, not a high-stakes exam system.
+Network latency affects speed points. Access to an `iastate.edu` account
+does not establish enrollment in a particular course.
 
-**LOCAL — Microsoft Edge, 1440px desktop, root `/`, production static build.**
-This screenshot is not evidence of an Azure deployment.
+## Stack and structure
 
-The warm Svelte composition keeps its rune counter, browser History API routes,
-and inline static-file health check. Edit `src/App.svelte` for content and
-`public/brand/family.v1.css` for the visual family; baseline styles remain in
-`src/app.css`.
+| Location | Responsibility |
+|---|---|
+| `src/App.svelte` | Responsive professor dashboard, student join screen, lobby, gameplay, results |
+| `src/lib/` | Typed browser API helpers and shared data types |
+| `src/app.css` | Responsive styles; no external fonts or UI service dependencies |
+| `server/app.ts` | Same-origin Express API and production static-file serving |
+| `server/auth.ts` | Builder-verified Entra identity, exact-domain check, professor allowlist |
+| `server/quiz.ts` | CSV validation, competition rules, timing, scoring, safe CSV exports |
+| `server/azure-sql.ts` | Encrypted, managed-identity Azure SQL access and transactional updates |
+| `server/sqlite.ts` | Local-only SQLite persistence for development/tests |
+| `server/schema.sql` | Idempotent Azure SQL schema migration; no seed data |
+| `public/sample-questions.csv` | Downloadable CSV example |
+| `tests/` | Competition, authorization, HTTP and persistence tests |
+| `builder.yaml` | One Node.js web component serving the UI and API |
 
-### Logo provenance
-
-`public/brand/builder.svg` is the supplied official App Service Builder mark.
-`public/brand/svelte.svg` is the unmodified [official Svelte SVG](https://svelte.dev/svelte-logo.svg)
-from [svelte.dev](https://svelte.dev/). Svelte is a trademark of its respective
-owner. Logos identify the stack; no endorsement is implied.
-
-**Check static health** reads `/health.json` and displays the result in place,
-including failures and retry guidance. A reachable static file is not a backend
-health probe or Azure deployment status. **Customize this sample** explains which
-files to edit in your fork; it does not guess your repository or app URL.
-Framework and App Service Builder documentation are labeled separately.
-
-## Features
-
-- Svelte landing page with an interactive counter.
-- Client-side navigation, browser back/forward handling, and a nested product page.
-- A client-side not-found page and trailing-slash normalization.
-- Static health and application identity JSON files.
-- Hashed JavaScript and CSS assets built into `dist/`.
-- A minimal `builder.yaml` that relies on Vite detection.
-- Dependency-free Node.js tests for build output and the local static HTTP contract.
-
-## Prerequisites
-
-- [Node.js 24 LTS](https://nodejs.org/) and its bundled npm are recommended.
-- [Git](https://git-scm.com/) and a GitHub account.
-- For deployment: App Service Builder Private Preview access, an authorized
-  Azure subscription, and an existing resource group in a supported preview
-  location.
-- Optional: [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell)
-  for the endpoint verification script.
-
-The lockfile contains Svelte **5.57.3**, Vite **8.3.5**, the Svelte Vite plugin
-**7.3.1**, and svelte-check **4.7.8**. Keep `package-lock.json` and use `npm ci`
-to install the locked versions rather than updating dependencies during setup.
+Competition state is stored as a JSON snapshot per competition in Azure SQL.
+Updates lock that competition's row inside a serializable transaction:
+concurrent submissions cannot overwrite each other, and duplicate professor
+actions cannot advance two rounds. Immutable quiz snapshots keep an existing
+competition independent of later imports. Timers are persisted deadlines,
+not in-memory scheduled jobs. Browser clients poll once per second and
+display a local countdown synchronized to server time.
 
 ## Run locally
 
-Fork
-[AzureAppService/app-service-builder-svelte](https://github.com/AzureAppService/app-service-builder-svelte/fork)
-to your GitHub account. Clone your fork, replacing `<your-github-account>`:
+Use Node.js 24 LTS (Node.js 22.13+ also supported).
 
-```sh
-git clone https://github.com/<your-github-account>/app-service-builder-svelte.git
-cd app-service-builder-svelte
+```powershell
 npm ci --ignore-scripts
-npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
+npm run dev
 ```
 
-Open `http://localhost:5173/`. Expect the heading `Svelte Vite SPA is running`.
-Click **Interaction count: 0** and confirm it increments. Follow **Open the
-deep route** to see `Widget 1`, then use **Return home** or browser navigation.
+Open the Vite URL printed in the terminal, normally `http://127.0.0.1:5173`.
+The development API listens on loopback port 3001. A yellow **LOCAL DEMO**
+banner makes simulated authentication explicit.
 
-The development server is local only and is not the deployed runtime. Stop
-it with Ctrl+C. The explicit `--strictPort` fails if the requested port is
-already in use instead of silently choosing another port.
+1. As **Professor**, download the example CSV, import it, and select **Host quiz**.
+2. Copy the join link or note the code.
+3. In a separate browser profile/private window, open the join link and select
+   **Student One** in the demo account selector. Enter a display name and join.
+   The selector is shared between tabs in the same browser profile; use separate
+   profiles to keep professor and student identities independent.
+4. Start the competition from the professor window, answer in the student
+   window, and advance through the reveals to the final leaderboard.
+5. Download the results CSV from the professor view.
 
-## Check, build, test, and preview
+Local quizzes/results persist in `.data/classroom.sqlite`. Override
+`LOCAL_DB_PATH` if needed. No Azure resource or actual account is used by this
+demo. Local URLs/QR codes only work on that computer; do not expose the demo
+API to a network to test phones.
 
-From the repository root:
+`npm start` is a different, production-only entry point: it requires Azure SQL
+and verified Builder identity headers. It never falls back to local storage or
+simulated sign-in. Vite preview alone does not run the API; use `npm run dev`
+for local interactive use.
 
-```sh
+## CSV format
+
+Use UTF-8 and these exact headers (order may vary):
+
+```csv
+question,option_a,option_b,option_c,option_d,correct_answer,time_limit_seconds
+Which city is home to Iowa State University?,Ames,Des Moines,Cedar Rapids,Iowa City,A,20
+```
+
+- 1-100 questions per file; maximum 500 KB.
+- Four nonempty choices, with one correct answer letter `A`-`D`.
+- Whole-number time limits from 5 to 120 seconds.
+- Question text: up to 1,000 characters; options: up to 300 each.
+- Quote fields containing commas, quotes, or newlines using standard CSV quoting.
+- Invalid files fail as a whole with a row/validation message; partial quizzes
+  are not saved.
+
+## App configuration
+
+Copy `.env.example` to `.env` for optional local settings. Never commit `.env`.
+In Builder, configure the same names as server-side variables/connection outputs;
+none belong in `VITE_*` variables or the browser bundle.
+
+| Variable | Meaning |
+|---|---|
+| `PROFESSOR_EMAILS` | Required in production: comma-separated professor accounts, initially `alora@iastate.edu` |
+| `ALLOWED_DOMAIN` | Exact permitted domain; defaults to `iastate.edu` |
+| `SQL_SERVER` | Azure SQL hostname, e.g. `your-server.database.windows.net` |
+| `SQL_DATABASE` | Existing Azure SQL database name |
+| `AZURE_CLIENT_ID` | Optional client ID to select an assigned user-managed identity |
+| `PORT` | Production listener, default `8080`; keep aligned with the manifest |
+
+Accounts not on `PROFESSOR_EMAILS` are students. Professors can control/export
+only competitions they own. Changing that allowlist requires redeploying the
+intended Builder configuration.
+
+## Azure SQL setup (not provisioned by this repository)
+
+Builder has no durable local disks. Production therefore requires a separately
+provisioned **Azure SQL Database**, not a SQLite file on the app filesystem.
+
+1. Use an Azure SQL logical server with Microsoft Entra administration configured.
+   Use Entra-only authentication; no SQL passwords are needed.
+2. Assign a managed identity to the Builder app. The existing app had a
+   system-assigned identity when inspected; assignment alone is not SQL access.
+3. An authorized database administrator creates a contained database user for
+   that identity and grants only `SELECT`, `INSERT`, and `UPDATE` on
+   `dbo.ClassroomRecords`. No runtime DDL/owner permissions are required.
+   Creating the identity user and applying the migration are administrator
+   operations, not automatic effects of setting environment variables.
+4. Apply `server/schema.sql` as an authorized administrator, or set
+   `SQL_SERVER`/`SQL_DATABASE`, sign in locally with `az login`, and run:
+
+   ```powershell
+   npm run db:migrate
+   ```
+
+   This explicit command uses the local Azure credential chain and needs schema
+   creation permissions. The production web process uses only managed identity.
+5. Allow the Builder runtime to reach the database through the SQL server's
+   network rules. Do not assume a private endpoint is reachable from Builder or
+   broadly open the firewall without evaluating the allowed source network.
+6. In Builder Connections, use the Azure SQL profile and map its server/database
+   outputs to `SQL_SERVER` and `SQL_DATABASE`. Configure the selected identity
+   consistently with `AZURE_CLIENT_ID` if using a user-assigned identity.
+
+Tokens are obtained server-side and connection pools rotate before token expiry.
+Database errors are not replaced with successful empty results or local data.
+`GET /api/health` performs an actual database/schema read and returns 503 on failure.
+
+## Sign-in and security
+
+The existing Builder app was inspected read-only on November 19, 2026:
+Microsoft Entra sign-in is **required**, its managed provider is enabled, and
+its allowed email domain is exactly **`iastate.edu`**. No authentication
+settings were changed. Verify this policy again before deployment.
+
+The backend reads `X-MS-CLIENT-PRINCIPAL*` headers only behind Builder's trusted
+authentication proxy, which verifies visitors and strips caller-supplied copies.
+It additionally enforces the exact email domain and professor allowlist.
+Never expose this backend directly to untrusted clients without an equivalent
+identity-verifying proxy: these headers are not independently signed by the app.
+An email allowlist is practical here; Entra tenant/object IDs are preferable for
+stronger long-term professor authorization.
+
+All mutating API calls require same-origin JSON/custom-header requests; the
+server does not enable CORS and rejects cross-site submissions. Student responses
+exclude roster emails, future questions, correct answers, and current-round
+scores before the reveal. CSV exports neutralize spreadsheet formulas.
+
+Student names/emails and answers are educational records. Obtain institutional
+approval and establish retention, backups, access reviews, and deletion procedures
+before real classroom use. This initial version has no data-retention UI or
+automated deletion policy. Configure database backup/retention accordingly.
+
+## Build, test and deploy
+
+```powershell
 npm run check
 npm run build
 npm test
-npm run preview -- --host 127.0.0.1 --port 8080 --strictPort
 ```
 
-Open `http://localhost:8080/` to view the production bundle. The local Vite
-preview is a development check of `dist/`, not a production server to deploy.
-Stop it with Ctrl+C.
+Build before testing: HTTP tests check the production HTML shell as well as API
+behavior. Tests use isolated SQLite databases, exercise 50 concurrent students,
+and verify deadlines, one-answer locking, hidden scores, replayed controls,
+authorization, exports and persistence after reopening the database.
+They do **not** establish Azure SQL or deployed authentication connectivity.
+CI runs the same commands on Windows and Linux.
 
-`npm run check` checks Svelte and JavaScript types using the existing
-`jsconfig.json`. Tests check the manifest, static output, health/version JSON,
-generated JavaScript and CSS, and local SPA-shell fallback. They start their
-own loopback-only preview on an available port and stop it when finished.
-Build before running `npm test`. GitHub Actions runs check, build, and tests
-on Linux and Windows with Node.js 24.
+The manifest now publishes a Node.js **web** application, not the former static
+Hello World site. The custom build stages `dist`, compiled server code, package
+metadata, and production dependencies under Builder's `DESTINATION_DIR`.
+The Node server serves the UI, `/j/:code`, `/host/:code`, and `/api/*`.
 
-With the preview running, optionally check the local or deployed URL using
-PowerShell 7:
+No Azure resources, permissions, variables or deployments were changed as part
+of the local implementation. Before deploying:
 
-```powershell
-pwsh -NoProfile -File .\scripts\verify.ps1 -BaseUrl http://localhost:8080
-```
+1. Confirm this Builder target supports **Node.js compute activation**; some
+   preview targets do not, even when builds succeed.
+2. Provision/authorize Azure SQL, apply the schema, and configure variables.
+3. Preserve required Entra sign-in and the exact domain restriction.
+4. Push the reviewed source and explicitly deploy through Builder.
+5. Verify the database health check, real professor/student sign-in, QR join,
+   direct join links/refreshes, concurrent answers and CSV export on the app URL.
 
-The script checks HTTP responses and the HTML shell; it does not execute
-Svelte. In a browser, also verify the counter, in-app navigation, back/forward,
-direct navigation to `/products/widget-1`, refreshing that route, and the
-unknown route's `Page not found` heading.
+App Service Builder is in Private Preview and documented for development/test,
+not production workloads. Do not use a successful local demo as evidence of
+cloud deployment or readiness for graded assessments.
 
-## Routes and SPA fallback
-
-| Route | Expected behavior |
-|---|---|
-| `/` | HTTP 200 shell; Svelte renders the landing page and counter |
-| `/products/widget-1` | HTTP 200 shell; Svelte renders `Widget 1` |
-| `/products/widget-1/` | Same client-side product page after trailing-slash normalization |
-| `/unknown-client-route` | HTTP 200 shell; Svelte renders `Page not found` |
-| `/health.json` | HTTP 200, static JSON with `"status": "ok"` |
-| `/version.json` | HTTP 200, static application and framework metadata |
-| `/assets/` files | Generated JavaScript and CSS loaded by the HTML shell |
-
-This app uses the browser History API, not hash-based routing. Direct nested
-links and refreshes require the deployed static host to return `index.html`
-for client-side routes. The manifest does not declare a separate fallback
-override. Verify this behavior after deployment; a successful root response
-alone is insufficient.
-
-The unknown client route intentionally has HTTP status 200 when the host
-returns the shell. Its not-found heading is rendered in the browser, not
-returned as a server-side HTTP 404. The health file is a static asset, not a
-running backend health probe.
-
-## Deployment contract
-
-The repository root contains `builder.yaml`:
-
-```yaml
-components:
-  - name: site
-    path: /
-```
-
-This intentionally relies on Vite detection to infer the Node.js build
-platform, `npm run build`, the `dist` output directory, and the static role.
-The source directory defaults to the repository root. The current test set
-already established the manifest requirement before this sample was deployed.
-
-Node.js is the build toolchain, not a deployed application server. Builder
-must publish the built `dist/` output, not the source directory or
-`node_modules/`. No custom build command, runtime port, or start command is
-needed. Do not select `src/`, `public/`, or `dist/` as the repository source
-directory.
-
-## Deploy your fork through Builder Portal
-
-Follow the [Portal quickstart](https://builder.appservice.azure.com/docs/quickstarts/portal/)
-for your authorized Private Preview environment:
-
-1. Commit and push the sample to the `main` branch of your GitHub repository.
-   Builder uses committed GitHub source, not local files.
-2. Open Builder Portal and select your enabled subscription, existing resource
-   group, and supported preview location.
-3. Connect GitHub and authorize the Builder GitHub app to access your repository.
-   Obtain organization-owner approval if required.
-4. Create an app using your repository, branch `main`, and the repository root
-   as its source directory. Keep `builder.yaml` at that root.
-5. Explicitly start deployment and wait for a successful terminal status.
-   Connecting a source or pushing a commit is not proof of deployment.
-6. Open the returned runtime URL and verify the landing page, counter, generated
-   assets, `/health.json`, and `/version.json`.
-7. Open `/products/widget-1` directly and refresh it. Open an unknown client
-   route and confirm Svelte renders `Page not found`.
-
-### Public build-time markers
-
-`VITE_DEPLOYMENT_MARKER` and `VITE_BUILD_MARKER` are optional labels displayed
-under deployment details. Both default to `local` and are embedded in the
-public JavaScript bundle at build time. They do not change the static health
-or version JSON files.
-
-For a local PowerShell build:
-
-```powershell
-$env:VITE_DEPLOYMENT_MARKER = "demo-1"
-$env:VITE_BUILD_MARKER = "hello-svelte"
-npm run build
-npm run preview -- --host 127.0.0.1 --port 8080 --strictPort
-```
-
-**Never put credentials, connection strings, or private information in
-`VITE_*` variables.** Changing an environment variable after the build does
-not update existing assets.
-
-For a deployed app, configure the labels in Portal **Variables**, then deploy
-to rebuild the static output. Saving variables alone does not establish that
-the current bundle changed. See the
-[variables guide](https://builder.appservice.azure.com/docs/guides/variables/).
-
-### Update and redeploy
-
-Edit the application, run check/build/tests, commit, and push to your fork's
-`main` branch. Explicitly deploy through Builder Portal, wait for completion,
-and verify the public pages and deep links again. Automatic deployment on push
-is not qualified by this sample.
-
-### Cleanup
-
-Delete only the Builder app you created and wait for deletion to complete.
-Do not delete a shared resource group, subscription, or unrelated resources.
-Deleting the app does not delete your GitHub repository or local clone.
-
-## Resources and contributions
-
-- [App Service Builder documentation](https://builder.appservice.azure.com/docs/)
-- [Sample catalog](https://builder.appservice.azure.com/docs/samples/)
-- [Manifest guide](https://builder.appservice.azure.com/docs/guides/builder-yaml/)
-- [Contributing](CONTRIBUTING.md)
-- [Code of Conduct](.github/CODE_OF_CONDUCT.md)
-- [Security reporting](SECURITY.md)
-- [Changelog](CHANGELOG.md)
-- [MIT license](LICENSE.md)
+References: [Builder authentication](https://builder.appservice.azure.com/docs/guides/authentication/),
+[storage boundaries](https://builder.appservice.azure.com/docs/guides/storage/),
+[Azure connections](https://builder.appservice.azure.com/docs/guides/connect-to-services/),
+[runtime availability](https://builder.appservice.azure.com/docs/reference/runtimes/).
